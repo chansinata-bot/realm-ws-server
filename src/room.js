@@ -24,10 +24,13 @@ function lastSeg(path) {
 }
 
 // --- Change these to control who is GM -------------------------------
-// true  = everyone who connects is GM (fine for solo testing)
-// or: list specific uids/login ids below and flip EVERYONE_GM to false
-const EVERYONE_GM = true;
-const GM_LOGIN_IDS = []; // e.g. ['myusername'] once you have named accounts
+// EVERYONE_GM = false  →  only uids listed in GM_UIDS are GM
+const EVERYONE_GM = false;
+const GM_UIDS = ['320ed424edc844e18fef'];
+const GM_LOGIN_IDS = []; // not used yet — login system is still a stub
+function isGM(session) {
+  return EVERYONE_GM || (session.uid && GM_UIDS.includes(session.uid));
+}
 // -----------------------------------------------------------------------
 
 export class GameRoom {
@@ -87,7 +90,7 @@ export class GameRoom {
           await this.storage.put('acct/' + id, acc);
         }
         session.uid = acc.uid;
-        const gm = EVERYONE_GM || GM_LOGIN_IDS.includes(acc.loginId);
+        const gm = isGM(session);
         reply({ uid: acc.uid, tok: acc.tok, id: acc.loginId, email: acc.email, time: Date.now(), gid: 'main', gm });
         break;
       }
@@ -163,7 +166,7 @@ export class GameRoom {
 
       // ---- GM tools (see gm_ext.js) ------------------------------------
       case 'gmgift': {
-        if (!(EVERYONE_GM)) { reply({ err: 'permission-denied' }); break; }
+        if (!isGM(session)) { reply({ err: 'permission-denied' }); break; }
         const targets = [];
         if (m.to) targets.push(m.to);
         else for (const s of this.sessions.values()) if (s.uid) targets.push(s.uid);
@@ -179,7 +182,7 @@ export class GameRoom {
         break;
       }
       case 'gmpeek': {
-        if (!(EVERYONE_GM)) { reply({ err: 'permission-denied' }); break; }
+        if (!isGM(session)) { reply({ err: 'permission-denied' }); break; }
         // Minimal stub: without the character-lookup-by-name index this
         // can only report "not found". Extend once character data is saved.
         reply({ ok: false, err: 'not-found' });
