@@ -192,6 +192,64 @@ export class GameRoom {
         reply({ ok: false, err: 'not-found' });
         break;
       }
+      case 'gmwarp': {
+        // GM-only: warp a character (or all online characters) to any map.
+        //
+        // Request fields:
+        //   m.map   {string}  required — target map id, e.g. "town", "dungeon_1"
+        //   m.x     {number}  optional — spawn X on the target map (default 0)
+        //   m.y     {number}  optional — spawn Y on the target map (default 0)
+        //   m.to    {string}  optional — uid of specific player to warp;
+        //                               omit to warp every online character
+        //
+        // What it does:
+        //   1. Writes the new map/x/y into rt/characters/<uid> in storage
+        //      so the data persists even if the player reconnects.
+        //   2. Pushes a "warp" event directly to the target player's
+        //      WebSocket so the client can react instantly without polling.
+        //
+        // Reply: { warped: number }  — how many characters were moved.
+
+        if (!isGM(session)) { reply({ err: 'permission-denied' }); break; }
+        if (!m.map) { reply({ err: 'invalid-argument', detail: 'map is required' }); break; }
+
+        const targetMap = String(m.map);
+        const targetX   = typeof m.x === 'number' ? m.x : 0;
+        const targetY   = typeof m.y === 'number' ? m.y : 0;
+
+        // Build list of (uid, ws) pairs to warp
+        const targets = [];
+        if (m.to) {
+          // warp a specific uid — they don't have to be online
+          targets.push({ uid: m.to, ws: null });
+          for (const [ws, s] of this.sessions) {
+            if (s.uid === m.to) { targets[0].ws = ws; break; }
+          }
+        } else {
+          // warp every online character
+          for (const [ws, s] of this.sessions) {
+            if (s.uid) targets.push({ uid: s.uid, ws });
+          }
+        }
+
+        let warped = 0;
+        for (const t of targets) {
+          const charPath = 'rt/characters/' + t.uid;
+          const cur = (await this.storage.get(charPath)) || {};
+          const next = Object.assign({}, cur, { map: targetMap, x: targetX, y: targetY });
+          await this.applySet(charPath, next);   // persist + notify subscribers
+
+          // Also push an explicit warp event so the client can
+          // teleport the sprite immediately without waiting for a sub update.
+          if (t.ws) {
+            this.send(t.ws, { ev: 'warp', map: targetMap, x: targetX, y: targetY, by: 'gm' });
+          }
+          warped++;
+        }
+
+        reply({ warped, map: targetMap, x: targetX, y: targetY });
+        break;
+      }
       case 'resetall': {
         if (!isGM(session)) { reply({ err: 'permission-denied' }); break; }
         if (m.confirm !== 'RESET') { reply({ ok: false, err: 'invalid-argument' }); break; }
