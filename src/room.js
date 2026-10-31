@@ -26,7 +26,7 @@ function lastSeg(path) {
 // --- Change these to control who is GM -------------------------------
 // EVERYONE_GM = false  →  only uids listed in GM_UIDS are GM
 const EVERYONE_GM = false;
-const GM_UIDS = ['320ed424edc844e18fef'];
+const GM_UIDS = ['320ed424edc844e18fef', 'b264361fe2ad41598747'];
 const GM_LOGIN_IDS = []; // not used yet — login system is still a stub
 function isGM(session) {
   return EVERYONE_GM || (session.uid && GM_UIDS.includes(session.uid));
