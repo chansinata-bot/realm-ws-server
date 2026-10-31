@@ -164,7 +164,11 @@ export class GameRoom {
         break;
       }
 
-      // ---- GM tools (see gm_ext.js) ------------------------------------
+      // ---- GM tools (see gm_ext.js / game.js gmCheck()) ------------------
+      case 'gmq': {
+        reply({ gm: isGM(session) });
+        break;
+      }
       case 'gmgift': {
         if (!isGM(session)) { reply({ err: 'permission-denied' }); break; }
         const targets = [];
@@ -186,6 +190,29 @@ export class GameRoom {
         // Minimal stub: without the character-lookup-by-name index this
         // can only report "not found". Extend once character data is saved.
         reply({ ok: false, err: 'not-found' });
+        break;
+      }
+      case 'resetall': {
+        if (!isGM(session)) { reply({ err: 'permission-denied' }); break; }
+        if (m.confirm !== 'RESET') { reply({ ok: false, err: 'invalid-argument' }); break; }
+        // NOTE: this is a stub. Wire this up to your own backup + wipe
+        // logic once you decide exactly what "reset everything" should
+        // back up and delete in this storage model.
+        reply({ ok: false, err: 'unavailable' });
+        break;
+      }
+      case 'epoch': {
+        const e = (await this.storage.get('meta/epoch')) || 0;
+        reply({ e });
+        break;
+      }
+      case 'gift': {
+        // Welcome-gift claim stub: tracks one claim per uid.
+        const key = 'gift/' + (session.uid || '');
+        const already = await this.storage.get(key);
+        if (already) { reply({ ok: true, got: false }); break; }
+        await this.storage.put(key, { ts: Date.now() });
+        reply({ ok: true, got: true });
         break;
       }
       case 'mbox': {
